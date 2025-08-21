@@ -56,6 +56,8 @@ The code and pretrained models will be released after the legal review is comple
 ## Contact
 [Han Cai](http://hancai.ai/)
 
+[Yuxian Gu](https://t1101675.github.io/)
+
 # 📖BibTeX
 ```
 @article{
