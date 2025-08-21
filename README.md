@@ -27,10 +27,14 @@ Unlike prior methods that train from scratch to explore new model architectures,
   <figcaption><ins>PostNAS first identifies the optimal placement of full-attention layers, then searches for improved attention block designs.</ins></figcaption>
 </figure>
 
+<br />
+
 <figure>
   <img src="assets/search-results.png" alt="teaser_page3"/>
   <figcaption><ins>In the pre-trained transformer model, not all attention layers contribute equally. PostNAS reveals important attention layers within pre-trained transformer models. </ins></figcaption>
 </figure>
+
+<br />
 
 <figure>
   <img src="assets/hardware-aware.png" alt="teaser_page4"/>
