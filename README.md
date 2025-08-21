@@ -22,23 +22,19 @@ Jet-Nemotron is a new family of hybrid-architecture language models that surpass
 ### Highlight 1: PostNAS – Post-Training Architecture Exploration and Adaptation
 Unlike prior methods that train from scratch to explore new model architectures, PostNAS builds on a pre-trained transformer model while enabling flexible exploration of attention block designs, greatly reducing the cost and risk of developing new language model architectures. 
 
+- <ins>PostNAS first identifies the optimal placement of full-attention layers, then searches for improved attention block designs.</ins>
 <figure>
   <img src="assets/postnas-roadmap.png" alt="teaser_page2"/>
-  <figcaption><ins>PostNAS first identifies the optimal placement of full-attention layers, then searches for improved attention block designs.</ins></figcaption>
 </figure>
 
-<br />
-
+- <ins>In the pre-trained transformer model, not all attention layers contribute equally. PostNAS reveals important attention layers within pre-trained transformer models. </ins>
 <figure>
   <img src="assets/search-results.png" alt="teaser_page3"/>
-  <figcaption><ins>In the pre-trained transformer model, not all attention layers contribute equally. PostNAS reveals important attention layers within pre-trained transformer models. </ins></figcaption>
 </figure>
 
-<br />
-
+- <ins>KV cache size is the most critical factor influencing long-context and long-generation throughput. PostNAS hardware-aware search discovers architectures that deliver similar generation throughput, while having more parameters and achieving better accuracy. </ins>
 <figure>
   <img src="assets/hardware-aware.png" alt="teaser_page4"/>
-  <figcaption><ins>KV cache size is the most critical factor influencing long-context and long-generation throughput. PostNAS hardware-aware search discovers architectures that deliver similar generation throughput, while having more parameters and achieving better accuracy. </ins></figcaption>
 </figure>
 
 ### Highlight 2: JetBlock - A New Linear Attention Module with SOTA Accuracy
@@ -49,9 +45,9 @@ With PostNAS, we introduce the JetBlock — a novel linear attention module that
 </p>
 
 ### Performance
+Jet-Nemotron-2B and Jet-Nemotron-4B match or surpass the accuracy of leading efficient language models (e.g., Qwen3) across a comprehensive benchmark suite while running significantly faster — 21× and 47× faster than Qwen3-1.7B-Base, respectively.
 <figure>
   <img src="assets/main-results.png" alt="teaser_page6"/>
-  <figcaption><ins>Jet-Nemotron-2B and Jet-Nemotron-4B match or surpass the accuracy of leading efficient language models (e.g., Qwen3) across a comprehensive benchmark suite while running significantly faster — 21× and 47× faster than Qwen3-1.7B-Base, respectively.</ins></figcaption>
 </figure>
 
 ## Contents
