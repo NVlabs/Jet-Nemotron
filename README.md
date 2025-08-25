@@ -64,7 +64,7 @@ The code and pretrained models will be released after the legal review is comple
  jet-nemotron,
  title={Jet-Nemotron: Efficient Language Model with Post Neural Architecture Search},
  author={Gu, Yuxian and Hu, Qinghao and Yang, Shang and Xi, Haocheng and Chen, junyu and Han, Song and Cai, Han},
- journal={arXiv},
+ journal={arXiv preprint arXiv:2508.15884},
  year={2025}
 }
 ```
