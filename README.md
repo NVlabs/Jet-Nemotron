@@ -2,7 +2,7 @@
 
 <div align="center">
   <a href="https://hanlab.mit.edu/projects/jet-nemotron/"><img src="https://img.shields.io/static/v1?label=Website&message=Jet-Nemotron&color=darkred&logo=github-pages"></a> &ensp;
-  <a href=""><img src="https://img.shields.io/static/v1?label=arXiv&message=Jet-Nemotron&color=red&logo=arxiv"></a> &ensp;
+  <a href="https://www.arxiv.org/pdf/2508.15884"><img src="https://img.shields.io/static/v1?label=arXiv&message=Jet-Nemotron&color=red&logo=arxiv"></a> &ensp;
   <a href="https://youtu.be/qAQ5yMThhRY"><img src="https://img.shields.io/static/v1?label=Demo&message=Jet-Nemotron&color=yellow"></a> &ensp;
 </div>
 
