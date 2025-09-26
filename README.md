@@ -11,6 +11,7 @@
 </p>
 
 ## 🔥🔥 News
+- (🔥 New) \[2025/9/25\] Jet-Nemotron is accepted by NeurIPS 2025.
 - (🔥 New) \[2025/8/22\] We released the Jet-Nemotron technical report on arXiv.
 
 ## 💡 Introduction
