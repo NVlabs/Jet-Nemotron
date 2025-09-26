@@ -58,6 +58,8 @@ The code and pretrained models will be released after the legal review is comple
 
 [Yuxian Gu](https://t1101675.github.io/)
 
+[Song Han](https://hanlab.mit.edu/songhan)
+
 # 📖BibTeX
 ```
 @article{
