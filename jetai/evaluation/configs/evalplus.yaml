@@ -1,0 +1,16 @@
+name: evalplus
+type: lm_eval_harness
+apply_chat_template: true
+system_instruction: "You are a helpful assistant."
+keys_to_remove_in_save: ["doc", "target"]
+max_length: 4096
+max_new_tokens: 768
+tasks:
+  - name: evalplus_mbpp
+    metric:
+      - pass_at_1_base,default
+      - pass_at_1_plus,default
+  - name: evalplus_humaneval
+    metric:
+      - pass_at_1_base,default
+      - pass_at_1_plus,default

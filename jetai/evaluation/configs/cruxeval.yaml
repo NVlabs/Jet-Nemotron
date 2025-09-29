@@ -1,0 +1,11 @@
+name: cruxeval
+type: lm_eval_harness
+max_length: 4096
+max_new_tokens: 2048
+tasks:
+  - name: cruxeval_input_cot
+    metric: 
+      - pass_at_5,default
+  - name: cruxeval_output_cot
+    metric: 
+      - pass_at_5,default

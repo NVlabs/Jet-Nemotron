@@ -1,0 +1,11 @@
+torch<=2.7.1
+transformers<=4.53.0
+flash-attn
+accelerate
+datasets>=4.0.0
+jieba
+fuzzywuzzy
+rouge
+python-Levenshtein
+flash-linear-attention@git+https://github.com/jet-ai-projects/flash-linear-attention.git@jetai
+lm_eval@git+https://github.com/jet-ai-projects/lm-evaluation-harness.git@jetai

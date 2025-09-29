@@ -1,0 +1,7 @@
+name: mmlu_pro
+type: lm_eval_harness
+max_length: 4096
+max_new_tokens: 2048
+tasks: 
+  - name: mmlu_pro
+    metric: exact_match,custom-extract

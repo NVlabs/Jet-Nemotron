@@ -1,0 +1,11 @@
+name: math_gen
+type: lm_eval_harness
+max_length: 4096
+max_new_tokens: 1024
+tasks:
+  - name: gsm8k
+    metric: exact_match,flexible-extract
+  - name: hendrycks_math
+    metric: exact_match,none
+  - name: gpqa_main_generative_n_shot
+    metric: exact_match,flexible-extract

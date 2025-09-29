@@ -1,0 +1,10 @@
+name: retrieval
+type: lm_eval_harness
+max_length: 4096
+tasks: 
+  - name: fda
+    metric: contains,none
+  - name: swde
+    metric: contains,none
+  - name: squad_completion
+    metric: contains,none

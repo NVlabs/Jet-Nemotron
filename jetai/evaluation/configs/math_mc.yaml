@@ -1,0 +1,8 @@
+name: math_mc
+type: lm_eval_harness
+max_length: 4096
+tasks: 
+  - name: mmlu_stem
+    metric: acc,none
+  - name: mathqa
+    metric: acc_norm,none

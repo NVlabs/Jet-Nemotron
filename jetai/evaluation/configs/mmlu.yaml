@@ -1,0 +1,15 @@
+name: mmlu
+type: lm_eval_harness
+max_length: 4096
+tasks: 
+  - name: mmlu
+    metric: acc,none
+subtasks:
+  - name: mmlu_stem
+    metric: acc,none
+  - name: mmlu_humanities
+    metric: acc,none
+  - name: mmlu_social_sciences
+    metric: acc,none
+  - name: mmlu_other
+    metric: acc,none

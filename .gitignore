@@ -1,0 +1,34 @@
+# python
+__pycache__
+.pytest_cache
+.ipynb_checkpoints/
+*.swp
+.pylintrc
+
+# vscode
+*.DS_Store
+.vscode
+
+# exp dir
+.test/
+.slurm/
+slurm-logs/
+slurm-*.out
+slurm-*.err
+
+# dataset
+assets/dataset/
+.cache
+processed_data
+
+# model
+checkpoints/
+*.safetensors
+jetai/modeling/hf/config.json
+jetai/modeling/hf/model.safetensors.index.json
+
+# logs
+results
+
+# build
+*.egg-info

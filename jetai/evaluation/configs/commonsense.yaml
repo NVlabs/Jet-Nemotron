@@ -1,0 +1,18 @@
+name: commonsense
+type: lm_eval_harness
+max_length: 4096
+tasks: 
+  - name: arc_challenge
+    metric: acc_norm,none
+  - name: arc_easy
+    metric: acc_norm,none
+  - name: piqa
+    metric: acc_norm,none
+  - name: winogrande
+    metric: acc,none
+  - name: openbookqa
+    metric: acc_norm,none
+  - name: boolq
+    metric: acc,none
+  - name: truthfulqa_mc2
+    metric: acc,none

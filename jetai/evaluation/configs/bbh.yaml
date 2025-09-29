@@ -1,0 +1,7 @@
+name: bbh
+type: lm_eval_harness
+max_length: 4096
+max_new_tokens: 1024
+tasks: 
+  - name: bbh
+    metric: exact_match,get-answer

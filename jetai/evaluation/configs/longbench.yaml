@@ -1,0 +1,15 @@
+name: longbench
+type: lm_eval_harness
+max_length: 262144
+max_new_tokens: 512
+tasks: 
+  - name: longbench_code
+    metric: score,none
+  - name: longbench_few_shot
+    metric: score,none
+  - name: longbench_summarization
+    metric: score,none
+  - name: longbench_single_doc
+    metric: score,none
+  - name: longbench_multi_doc
+    metric: score,none
