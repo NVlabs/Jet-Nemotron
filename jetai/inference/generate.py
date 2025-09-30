@@ -28,17 +28,32 @@ model_name_or_path = args.model_name_or_path
 # NOTE: Be sure to download or soft link the model weights to `jetai/modeling/hf`
 # model_name_or_path = "jetai/modeling/hf/"
 
-model = AutoModelForCausalLM.from_pretrained(model_name_or_path, 
-                                             trust_remote_code=True, 
-                                             attn_implementation="flash_attention_2",
-                                             torch_dtype=torch.bfloat16,
-                                             device_map="cuda")
+# Determine the device and torch_dtype for model loading
+if torch.cuda.is_available():
+    device = "cuda"
+    torch_dtype = torch.bfloat16
+    attn_implementation = "flash_attention_2"
+    device_map = "cuda"
+else:
+    device = "cpu"
+    torch_dtype = torch.float32  # bfloat16 is not well-supported on most CPUs
+    attn_implementation = "eager"
+    device_map = "cpu"
+    print("Warning: CUDA not available. Running on CPU. This will be slower.")
+
+model = AutoModelForCausalLM.from_pretrained(
+    model_name_or_path,
+    trust_remote_code=True,
+    attn_implementation=attn_implementation,
+    torch_dtype=torch_dtype,
+    device_map=device_map
+)
 tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, trust_remote_code=True)
-model = model.eval().cuda()
+model = model.eval().to(device)
 
 input_str = "Hello, I'm Jet-Nemotron from NVIDIA."
 
-input_ids = tokenizer(input_str, return_tensors="pt").input_ids.cuda()
+input_ids = tokenizer(input_str, return_tensors="pt").input_ids.to(device)
 output = model.generate(input_ids, max_new_tokens=50, do_sample=False)
-output_str = tokenizer.decode(output[0], skip_special_tokens=True)
+output_str = tokenizer.decode(output, skip_special_tokens=True)
 print(output_str)

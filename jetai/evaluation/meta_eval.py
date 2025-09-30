@@ -64,12 +64,28 @@ def main():
         
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, trust_remote_code=True)
     tokenizer.pad_token = tokenizer.eos_token
-    model = AutoModelForCausalLM.from_pretrained(args.model_name_or_path, 
-                                                 trust_remote_code=True,
-                                                 attn_implementation="flash_attention_2",
-                                                 torch_dtype=torch.bfloat16,
-                                                 device_map="cuda")
-    model = model.eval().cuda()
+
+    # Determine the device and torch_dtype for model loading
+    if torch.cuda.is_available():
+        device = "cuda"
+        torch_dtype = torch.bfloat16
+        attn_implementation = "flash_attention_2"
+        device_map = "cuda"
+    else:
+        device = "cpu"
+        torch_dtype = torch.float32  # bfloat16 is not well-supported on most CPUs
+        attn_implementation = "eager"
+        device_map = "cpu"
+        dist_print("Warning: CUDA not available. Running on CPU. Distributed evaluation may not be fully supported.")
+
+    model = AutoModelForCausalLM.from_pretrained(
+        args.model_name_or_path,
+        trust_remote_code=True,
+        attn_implementation=attn_implementation,
+        torch_dtype=torch_dtype,
+        device_map=device_map
+    )
+    model = model.eval().to(device)
     model = HFModel(model)
     
     max_seq_len = args.max_length if args.max_length is not None else eval_config.get("max_length", None)

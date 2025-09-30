@@ -142,19 +142,17 @@ class DynamicShortConvolution(nn.Module):
         if mask is not None:
             x = x.mul_(mask.unsqueeze(-1))
 
-        implementation = self.implementation
-        if implementation == "triton" and not self.training:
-            implementation = "triton_cache"
+        # Check for CUDA availability to decide whether to use Triton kernels
+        use_triton = torch.cuda.is_available() and self.implementation.startswith("triton")
 
         # during the decoding phase, we assume the batch is composed of sequences of length 1
         if cache is not None and B * T == N:
             assert T == 1
-            if implementation in ["naive", "triton_training"]:
-                x, cache = self._step_naive(x, cache, cu_seqlens, generator_input=generator_input)
-            elif implementation in ["triton", "triton_cache", "triton_decoding"]:
+            if use_triton:
                 x, cache = self._step_triton(x, cache, cu_seqlens, generator_input=generator_input)
             else:
-                raise ValueError(f"Unknown implementation: {implementation}")
+                # Fallback to naive step on CPU
+                x, cache = self._step_naive(x, cache, cu_seqlens, generator_input=generator_input)
             return x, cache
 
         if output_final_state:
@@ -162,15 +160,22 @@ class DynamicShortConvolution(nn.Module):
         else:
             new_cache = None
         
-        if implementation in ["naive", "triton_decoding"]:
-            x = self._forward_naive(x, generator_input=generator_input)  # [B, T, D]
-        elif implementation in ["triton", "triton_training"]:
-            assert cache is None, "Cache not supported in pure triton mode. Please set model.eval() or use triton_cache mode."
-            x = self._forward_triton(x, generator_input=generator_input)
-        elif implementation == "triton_cache":
-            x = self._forward_triton_cache(x, generator_input=generator_input, cache=cache)
+        if use_triton:
+            implementation = self.implementation
+            if implementation == "triton" and not self.training:
+                implementation = "triton_cache"
+
+            if implementation in ["triton", "triton_training"]:
+                assert cache is None, "Cache not supported in pure triton mode. Please set model.eval() or use triton_cache mode."
+                x = self._forward_triton(x, generator_input=generator_input)
+            elif implementation == "triton_cache":
+                x = self._forward_triton_cache(x, generator_input=generator_input, cache=cache)
+            else:
+                # Fallback for other triton modes or if logic dictates
+                x = self._forward_naive(x, generator_input=generator_input)
         else:
-            raise ValueError(f"Unknown implementation: {implementation}")
+            # Fallback to the naive PyTorch implementation on CPU
+            x = self._forward_naive(x, generator_input=generator_input)
 
         if self.activation is not None:
             x = ACT2FN[self.activation](x)
@@ -205,13 +210,13 @@ class DynamicShortConvolution(nn.Module):
         assert not self.training, "Triton implementation is only available in eval mode."
         # cache: [B, D, T(W)]
         CHUNK_SIZE = 2048
-        n_chunk = (x.shape[1] + CHUNK_SIZE - 1) // CHUNK_SIZE
+        n_chunk = (x.shape + CHUNK_SIZE - 1) // CHUNK_SIZE
         output_triton = torch.zeros_like(x)
         if cache is not None:
             cache = rearrange(cache, "b d t -> b t d")  # [B, T(W), D]
         for i in range(n_chunk):
             start = i * CHUNK_SIZE
-            end = min((i + 1) * CHUNK_SIZE, x.shape[1])
+            end = min((i + 1) * CHUNK_SIZE, x.shape)
             kernels = self.get_kernel(generator_input[:, start:end])
             out = dynamic_conv_triton_cache(x[:, start:end], kernels, cache=cache)
             output_triton[:, i*CHUNK_SIZE:end, :] = out
@@ -225,7 +230,7 @@ class DynamicShortConvolution(nn.Module):
         cu_seqlens: Optional[torch.LongTensor] = None,
         generator_input: Optional[torch.Tensor] = None
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        assert x.shape[1] == 1, "x must be of shape [B, 1, D]"
+        assert x.shape == 1, "x must be of shape [B, 1, D]"
         shape = x.shape
         generator_input = x if generator_input is None else generator_input
         x = x.squeeze(1)
@@ -252,7 +257,7 @@ class DynamicShortConvolution(nn.Module):
         generator_input: Optional[torch.Tensor] = None
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         # --- Triton Implementation ---
-        assert x.shape[1] == 1, "x must be of shape [B, 1, D]"
+        assert x.shape == 1, "x must be of shape [B, 1, D]"
         shape = x.shape # Keep original shape [B, 1, D] for return
         generator_input = x if generator_input is None else generator_input
 
