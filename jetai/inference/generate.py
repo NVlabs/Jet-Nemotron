@@ -55,5 +55,5 @@ input_str = "Hello, I'm Jet-Nemotron from NVIDIA."
 
 input_ids = tokenizer(input_str, return_tensors="pt").input_ids.to(device)
 output = model.generate(input_ids, max_new_tokens=50, do_sample=False)
-output_str = tokenizer.decode(output, skip_special_tokens=True)
+output_str = tokenizer.decode(output[0], skip_special_tokens=True)
 print(output_str)
