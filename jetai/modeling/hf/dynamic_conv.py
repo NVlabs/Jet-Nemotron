@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import warnings
 from collections import OrderedDict
 from typing import Optional, Tuple, Callable
 
@@ -142,19 +143,17 @@ class DynamicShortConvolution(nn.Module):
         if mask is not None:
             x = x.mul_(mask.unsqueeze(-1))
 
-        implementation = self.implementation
-        if implementation == "triton" and not self.training:
-            implementation = "triton_cache"
+        # Check for CUDA availability to decide whether to use Triton kernels
+        use_triton = torch.cuda.is_available() and self.implementation.startswith("triton")
 
         # during the decoding phase, we assume the batch is composed of sequences of length 1
         if cache is not None and B * T == N:
             assert T == 1
-            if implementation in ["naive", "triton_training"]:
-                x, cache = self._step_naive(x, cache, cu_seqlens, generator_input=generator_input)
-            elif implementation in ["triton", "triton_cache", "triton_decoding"]:
+            if use_triton:
                 x, cache = self._step_triton(x, cache, cu_seqlens, generator_input=generator_input)
             else:
-                raise ValueError(f"Unknown implementation: {implementation}")
+                # Fallback to naive step on CPU
+                x, cache = self._step_naive(x, cache, cu_seqlens, generator_input=generator_input)
             return x, cache
 
         if output_final_state:
@@ -162,15 +161,23 @@ class DynamicShortConvolution(nn.Module):
         else:
             new_cache = None
         
-        if implementation in ["naive", "triton_decoding"]:
-            x = self._forward_naive(x, generator_input=generator_input)  # [B, T, D]
-        elif implementation in ["triton", "triton_training"]:
-            assert cache is None, "Cache not supported in pure triton mode. Please set model.eval() or use triton_cache mode."
-            x = self._forward_triton(x, generator_input=generator_input)
-        elif implementation == "triton_cache":
-            x = self._forward_triton_cache(x, generator_input=generator_input, cache=cache)
+        if use_triton:
+            implementation = self.implementation
+            if implementation == "triton" and not self.training:
+                implementation = "triton_cache"
+
+            if implementation in ["triton", "triton_training"]:
+                assert cache is None, "Cache not supported in pure triton mode. Please set model.eval() or use triton_cache mode."
+                x = self._forward_triton(x, generator_input=generator_input)
+            elif implementation == "triton_cache":
+                x = self._forward_triton_cache(x, generator_input=generator_input, cache=cache)
+            else:
+                # Fallback for other triton modes or if logic dictates
+                warnings.warn(f"Unknown triton implementation mode `{self.implementation}`. Falling back to naive PyTorch implementation.")
+                x = self._forward_naive(x, generator_input=generator_input)
         else:
-            raise ValueError(f"Unknown implementation: {implementation}")
+            # Fallback to the naive PyTorch implementation on CPU
+            x = self._forward_naive(x, generator_input=generator_input)
 
         if self.activation is not None:
             x = ACT2FN[self.activation](x)
