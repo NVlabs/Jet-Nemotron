@@ -167,6 +167,21 @@ python3 jetai/inference/measure_throuput.py --model_name_or_path jetai/Jet-Nemot
 python3 jetai/inference/measure_throuput.py --model_name_or_path jetai/Jet-Nemotron-4B --batch_size 64 --prefill_chunk_size 1024
 ```
 
+<details>
+  <summary>Measure Throughput for All Context Lengths</summary>
+
+  ```bash
+  python3 jetai/inference/measure_throuput.py --model_name_or_path jetai/Jet-Nemotron-2B --prompt_len 4096 --batch_size 1024 --prefill_chunk_size 256
+  python3 jetai/inference/measure_throuput.py --model_name_or_path jetai/Jet-Nemotron-2B --prompt_len 8192 --batch_size 512 --prefill_chunk_size 512
+  python3 jetai/inference/measure_throuput.py --model_name_or_path jetai/Jet-Nemotron-2B --prompt_len 16384 --batch_size 512 --prefill_chunk_size 512
+  python3 jetai/inference/measure_throuput.py --model_name_or_path jetai/Jet-Nemotron-2B --prompt_len 32768 --batch_size 256 --prefill_chunk_size 1024
+  python3 jetai/inference/measure_throuput.py --model_name_or_path jetai/Jet-Nemotron-2B --prompt_len 65536 --batch_size 128 --prefill_chunk_size 2048
+  python3 jetai/inference/measure_throuput.py --model_name_or_path jetai/Jet-Nemotron-2B --prompt_len 131072 --batch_size 128 --prefill_chunk_size 2048
+  python3 jetai/inference/measure_throuput.py --model_name_or_path jetai/Jet-Nemotron-2B --prompt_len 262144 --batch_size 64 --prefill_chunk_size 2048
+  ```
+
+</details>
+
 ## 6 Build Your Own JetBlock
 The following code is a minimal example to build your own JetBlock.
 ```python
