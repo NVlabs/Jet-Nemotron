@@ -177,11 +177,14 @@ class JetBlock(nn.Module):
             last_state = past_key_value[self.layer_idx]
 
         cu_seqlens = kwargs.get('cu_seqlens', None)
+        indices = None
+        
+        # Pack hidden_states FIRST if masked (following gypsum pattern)
         if attention_mask is not None and q_len > 1:
             indices, cu_seqlens, _ = get_unpad_data(attention_mask[:, -q_len:])
+            hidden_states = index_first_axis(rearrange(hidden_states, "b s ... -> (b s) ..."), indices).unsqueeze(0)
 
-        conv_mask = attention_mask[:, -hidden_states.shape[1]:] if attention_mask is not None else None
-
+        # Now compute projections from (potentially packed) hidden_states
         q = F.silu(self.q_proj(hidden_states))
         k = F.silu(self.k_proj(hidden_states))
 
@@ -191,16 +194,11 @@ class JetBlock(nn.Module):
         v, conv_state = self.dynamic_conv1d(
             x=self.v_proj(hidden_states),
             generator_input=hidden_states,
-            mask=conv_mask,
+            mask=None,  # No mask needed - hidden_states is already packed
             cache=conv_state,
             output_final_state=use_cache,
+            cu_seqlens=cu_seqlens,
         )
-
-        if attention_mask is not None and q_len > 1:
-            q = index_first_axis(rearrange(q, "b s ... -> (b s) ..."), indices).unsqueeze(0)
-            k = index_first_axis(rearrange(k, "b s ... -> (b s) ..."), indices).unsqueeze(0)
-            v = index_first_axis(rearrange(v, "b s ... -> (b s) ..."), indices).unsqueeze(0)
-            hidden_states = index_first_axis(rearrange(hidden_states, "b s ... -> (b s) ..."), indices).unsqueeze(0)
         
         q, k = map(lambda x: rearrange(x, '... (h d) -> ... h d', d=self.head_k_dim), (q, k))
         v = rearrange(v, '... (h d) -> ... h d', d=self.head_v_dim)
@@ -249,7 +247,9 @@ class JetBlock(nn.Module):
         o = self.o_norm(o, g)
         o = rearrange(o, 'b t h d -> b t (h d)')
         o = self.o_proj(o)
-        if attention_mask is not None and q_len > 1:
+        
+        # Restore original layout for masked inputs (following gypsum pattern)
+        if indices is not None:
             o = pad_input(o.squeeze(0), indices, batch_size, q_len)
 
         return o, past_key_value

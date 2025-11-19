@@ -132,8 +132,6 @@ class DynamicShortConvolution(nn.Module):
         return: [B, T, D]
         """
         
-        assert cu_seqlens is None, "cu_seqlens not supported yet."
-        
         B, T, D, W = *x.shape, self.kernel_size
         N = B
 
@@ -166,7 +164,7 @@ class DynamicShortConvolution(nn.Module):
             x = self._forward_naive(x, generator_input=generator_input)  # [B, T, D]
         elif implementation in ["triton", "triton_training"]:
             assert cache is None, "Cache not supported in pure triton mode. Please set model.eval() or use triton_cache mode."
-            x = self._forward_triton(x, generator_input=generator_input)
+            x = self._forward_triton(x, generator_input=generator_input, cu_seqlens=cu_seqlens)
         elif implementation == "triton_cache":
             x = self._forward_triton_cache(x, generator_input=generator_input, cache=cache)
         else:
@@ -193,10 +191,10 @@ class DynamicShortConvolution(nn.Module):
         x = (x * kernels).sum(dim=-1)  # [B, T, D]
         return x
 
-    def _forward_triton(self, x: torch.Tensor, generator_input: Optional[torch.Tensor] = None) -> torch.Tensor:
+    def _forward_triton(self, x: torch.Tensor, generator_input: Optional[torch.Tensor] = None, cu_seqlens: Optional[torch.LongTensor] = None) -> torch.Tensor:
         generator_input = x if generator_input is None else generator_input
         kernels = self.get_kernel(generator_input)
-        output_triton = dynamic_conv_triton_autograd(x, kernels)
+        output_triton = dynamic_conv_triton_autograd(x, kernels, cu_seqlens)
         return output_triton
 
     @torch.no_grad
