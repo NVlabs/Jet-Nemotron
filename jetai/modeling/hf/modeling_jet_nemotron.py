@@ -1042,7 +1042,7 @@ class JetNemotronForCausalLM(JetNemotronPreTrainedModel, GenerationMixin):
             attentions=outputs.attentions,
         )
 
-    # this version with device argument is for transformers <=4.53
+    # transformers <=4.53 takes device argument at this end but this is removed in 4.57.1
     def _prepare_cache_for_generation(
         self,
         generation_config: GenerationConfig,
@@ -1050,20 +1050,7 @@ class JetNemotronForCausalLM(JetNemotronPreTrainedModel, GenerationMixin):
         assistant_model: "PreTrainedModel",
         batch_size: int,
         max_cache_length: int,
-        device: torch.device,
-    ) -> bool:
-        assert not generation_config.return_legacy_cache, "Legacy cache is not supported for generation."
-        if generation_config.use_cache is False:
-            return
-        model_kwargs["past_key_values"] = JetNemotronCache()
-    
-    def _prepare_cache_for_generation(
-        self,
-        generation_config: GenerationConfig,
-        model_kwargs: dict,
-        assistant_model: "PreTrainedModel",
-        batch_size: int,
-        max_cache_length: int,
+        *args,
     ) -> bool:
         assert not generation_config.return_legacy_cache, "Legacy cache is not supported for generation."
         if generation_config.use_cache is False:
