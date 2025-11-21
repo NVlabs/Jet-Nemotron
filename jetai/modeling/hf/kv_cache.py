@@ -26,6 +26,8 @@ __all__ = ["JetCache"]
 
 class JetNemotronCache(transformers.cache_utils.Cache):
 
+    is_compileable = False # compatible with transformers 4.57.1
+
     def __init__(
         self,
         seen_tokens: int = 0
