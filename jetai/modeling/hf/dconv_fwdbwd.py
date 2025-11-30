@@ -25,22 +25,63 @@ from torch.autograd import Function
 def ensure_contiguous(t: torch.Tensor) -> torch.Tensor:
     return t if t.is_contiguous() else t.contiguous()
 
+def prepare_chunk_indices(cu_seqlens: torch.LongTensor, chunk_size: int) -> torch.LongTensor:
+    """
+    Prepare chunk indices for variable-length sequences.
+    
+    Creates a mapping from chunk index to (sequence_idx, token_within_sequence)
+    for efficient processing of variable-length sequences in Triton kernels.
+    
+    Args:
+        cu_seqlens: Cumulative sequence lengths [N+1]
+        chunk_size: Size of each chunk
+        
+    Returns:
+        Tensor of shape [total_chunks, 2] where each row contains [sequence_idx, token_within_sequence]
+    """
+    lens = cu_seqlens[1:] - cu_seqlens[:-1]
+    indices = torch.cat(
+        [torch.arange(n) for n in triton.cdiv(lens, chunk_size).tolist()]
+    )
+    return torch.stack([indices.eq(0).cumsum(0) - 1, indices], 1).to(cu_seqlens)
+
 # --- Forward Kernel (from previous step, slight modifications for autograd context) ---
+@triton.heuristics({
+    "IS_VARLEN": lambda args: args["cu_seqlens"] is not None,
+})
 @triton.jit
 def _dynamic_conv_fwd_kernel(
     X_ptr, K_ptr, Out_ptr,
+    cu_seqlens, chunk_indices,
     B, T, D,
     X_stride_b, X_stride_t, X_stride_d,
     K_stride_b, K_stride_t, K_stride_d, K_stride_w,
     Out_stride_b, Out_stride_t, Out_stride_d,
     W: tl.constexpr,
     BLOCK_SIZE_D: tl.constexpr,
+    IS_VARLEN: tl.constexpr,
 ):
-    pid_batch_time = tl.program_id(0)
+    pid_token = tl.program_id(0)
     pid_d_block = tl.program_id(1)
 
-    batch_idx = tl.cast(pid_batch_time // T, tl.int64)
-    time_idx = pid_batch_time % T
+    # Handle varlen or standard indexing
+    if IS_VARLEN:
+        # For varlen: Use chunk_indices to map program_id -> (sequence_idx, token_within_seq)
+        i_n = tl.load(chunk_indices + pid_token * 2).to(tl.int32)
+        i_t = tl.load(chunk_indices + pid_token * 2 + 1).to(tl.int32)
+        
+        # Load sequence boundaries
+        bos = tl.load(cu_seqlens + i_n)
+        eos = tl.load(cu_seqlens + i_n + 1)
+        
+        time_idx = i_t
+        batch_idx = i_n
+    else:
+        # Standard: pid_token encodes both batch and time
+        batch_idx = tl.cast(pid_token // T, tl.int64)
+        time_idx = pid_token % T
+        bos = 0
+        eos = T
 
     offs_d = pid_d_block * BLOCK_SIZE_D + tl.arange(0, BLOCK_SIZE_D)
     d_mask = offs_d < D
@@ -49,15 +90,28 @@ def _dynamic_conv_fwd_kernel(
     offs_w = tl.arange(0, W)
 
     # Load Kernels
-    k_ptrs = K_ptr + (batch_idx * K_stride_b + time_idx * K_stride_t +
-                      offs_d[:, None] * K_stride_d + offs_w[None, :] * K_stride_w)
+    if IS_VARLEN:
+        # For varlen, kernels are [1, Total_Tokens, D, W]
+        abs_token_idx = bos + time_idx
+        k_ptrs = K_ptr + (0 * K_stride_b + abs_token_idx * K_stride_t +
+                          offs_d[:, None] * K_stride_d + offs_w[None, :] * K_stride_w)
+    else:
+        k_ptrs = K_ptr + (batch_idx * K_stride_b + time_idx * K_stride_t +
+                          offs_d[:, None] * K_stride_d + offs_w[None, :] * K_stride_w)
     k_vals = tl.load(k_ptrs, mask=d_mask[:, None], other=0.0)
 
     # Load Input X with implicit padding
-    t_in_offs = time_idx + offs_w - W + 1
-    t_in_mask = (t_in_offs >= 0) & (t_in_offs < T)
-    x_ptrs = X_ptr + (batch_idx * X_stride_b + t_in_offs[None, :] * X_stride_t +
-                      offs_d[:, None] * X_stride_d)
+    if IS_VARLEN:
+        # For varlen, X is [1, Total_Tokens, D]
+        t_in_abs = bos + time_idx + offs_w - W + 1
+        t_in_mask = (t_in_abs >= bos) & (t_in_abs < eos)
+        x_ptrs = X_ptr + (0 * X_stride_b + t_in_abs[None, :] * X_stride_t + 
+                          offs_d[:, None] * X_stride_d)
+    else:
+        t_in_offs = time_idx + offs_w - W + 1
+        t_in_mask = (t_in_offs >= 0) & (t_in_offs < T)
+        x_ptrs = X_ptr + (batch_idx * X_stride_b + t_in_offs[None, :] * X_stride_t +
+                          offs_d[:, None] * X_stride_d)
     x_load_mask = d_mask[:, None] & t_in_mask[None, :]
     x_vals = tl.load(x_ptrs, mask=x_load_mask, other=0.0)
 
@@ -66,8 +120,14 @@ def _dynamic_conv_fwd_kernel(
     accumulator += tl.sum(product, axis=1)
 
     # Store Result
-    out_ptrs = Out_ptr + (batch_idx * Out_stride_b + time_idx * Out_stride_t +
-                          offs_d * Out_stride_d)
+    if IS_VARLEN:
+        # For varlen, output is [1, Total_Tokens, D]
+        abs_token_idx = bos + time_idx
+        out_ptrs = Out_ptr + (0 * Out_stride_b + abs_token_idx * Out_stride_t + 
+                              offs_d * Out_stride_d)
+    else:
+        out_ptrs = Out_ptr + (batch_idx * Out_stride_b + time_idx * Out_stride_t +
+                              offs_d * Out_stride_d)
     tl.store(out_ptrs, accumulator, mask=d_mask)
 
 # --- Backward Kernel for Input Gradient (dX) ---
@@ -214,11 +274,12 @@ def _dynamic_conv_bwd_dk_kernel(
 class DynamicConvTritonFunc(Function):
 
     @staticmethod
-    def forward(ctx, x, kernels):
+    def forward(ctx, x, kernels, cu_seqlens=None):
         """
         Args:
-            x: Input tensor [B, T, D]
-            kernels: Kernels tensor [B, T, D, W]
+            x: Input tensor [B, T, D] or [1, Total_Tokens, D] for packed
+            kernels: Kernels tensor [B, T, D, W] or [1, Total_Tokens, D, W] for packed
+            cu_seqlens: Optional cumulative sequence lengths [N+1] for varlen
         """
         x = ensure_contiguous(x)
         kernels = ensure_contiguous(kernels)
@@ -229,11 +290,23 @@ class DynamicConvTritonFunc(Function):
 
         out = torch.empty_like(x) # Output shape [B, T, D]
 
-        grid = lambda meta: (B * T, triton.cdiv(D, meta['BLOCK_SIZE_D']))
+        # Prepare varlen parameters
+        if cu_seqlens is not None:
+            cu_seqlens = ensure_contiguous(cu_seqlens)
+            # For dynamic conv, use chunk_size=1 since each token has its own kernel
+            chunk_indices = prepare_chunk_indices(cu_seqlens, chunk_size=1)
+            NT = len(chunk_indices)
+            assert B == 1, f"When cu_seqlens is provided, B must be 1 (packed), got {B}"
+        else:
+            chunk_indices = None
+            NT = B * T
+
+        grid = lambda meta: (NT, triton.cdiv(D, meta['BLOCK_SIZE_D']))
         BLOCK_SIZE_D = 128 # Consider tuning
 
         _dynamic_conv_fwd_kernel[grid](
             x, kernels, out,
+            cu_seqlens, chunk_indices,
             B, T, D,
             x.stride(0), x.stride(1), x.stride(2),
             kernels.stride(0), kernels.stride(1), kernels.stride(2), kernels.stride(3),
@@ -300,19 +373,20 @@ class DynamicConvTritonFunc(Function):
         )
 
         # Return gradients in the order inputs were received by forward
-        return grad_x, grad_kernels
+        return grad_x, grad_kernels, None
 
 # --- User-facing function ---
-def dynamic_conv_triton_autograd(x: torch.Tensor, kernels: torch.Tensor) -> torch.Tensor:
+def dynamic_conv_triton_autograd(x: torch.Tensor, kernels: torch.Tensor, cu_seqlens: torch.Tensor = None) -> torch.Tensor:
     """
     Fused dynamic convolution with autograd support using Triton kernels.
     Assumes W <= 4.
 
     Args:
-        x: Input tensor of shape [B, T, D].
-        kernels: Dynamic kernels of shape [B, T, D, W].
+        x: Input tensor of shape [B, T, D] or [1, Total_Tokens, D] for packed.
+        kernels: Dynamic kernels of shape [B, T, D, W] or [1, Total_Tokens, D, W] for packed.
+        cu_seqlens: Optional cumulative sequence lengths [N+1] for varlen support.
 
     Returns:
         Output tensor of shape [B, T, D].
     """
-    return DynamicConvTritonFunc.apply(x, kernels)
+    return DynamicConvTritonFunc.apply(x, kernels, cu_seqlens)
