@@ -70,7 +70,7 @@ Jet-Nemotron-2B and Jet-Nemotron-4B match or surpass the accuracy of leading eff
 ## 1 Setup Environments
 ```bash
 git clone https://github.com/NVlabs/Jet-Nemotron
-cd Sana
+cd Jet-Nemotron
 pip3 install -e .
 ```
 
