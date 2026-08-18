@@ -163,8 +163,8 @@ NOTE: The evaluation code will use the `.parquet` version of `social_i_qa`, `mat
 
 ## 5 Measure Throughput
 ```bash
-python3 jetai/inference/measure_throuput.py --model_name_or_path jetai/Jet-Nemotron-2B
-python3 jetai/inference/measure_throuput.py --model_name_or_path jetai/Jet-Nemotron-4B --batch_size 64 --prefill_chunk_size 1024
+python3 jetai/inference/measure_throughput.py --model_name_or_path jetai/Jet-Nemotron-2B
+python3 jetai/inference/measure_throughput.py --model_name_or_path jetai/Jet-Nemotron-4B --batch_size 64 --prefill_chunk_size 1024
 ```
 
 <details>
